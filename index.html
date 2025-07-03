@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, orientation=landscape">
+    <title>Glowing Forest</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .game-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        #game-canvas {
+            width: 100vw;
+            height: 100vh;
+            object-fit: fill; /* Stretch to fill the viewport */
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .bunny-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 25%; /* Confine bunnies to the bottom 25% (grass area) */
+            pointer-events: none;
+        }
+
+        .bunny {
+            position: absolute;
+            width: 50px; /* Adjust size as needed */
+            height: 50px;
+            will-change: transform;
+        }
+        
+        /* Mobile landscape optimization */
+        @media screen and (max-width: 768px) and (orientation: landscape) {
+            #game-canvas {
+                width: 100vw;
+                height: 100vh;
+            }
+        }
+        
+        /* Force landscape on mobile */
+        @media screen and (max-width: 768px) and (orientation: portrait) {
+            body::before {
+                content: "Please rotate your device to landscape mode";
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background: rgba(0, 0, 0, 0.9);
+                color: white;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                font-size: 1.5em;
+                z-index: 1000;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <canvas id="game-canvas"></canvas>
+        <div id="bunny-container" class="bunny-container"></div>
+    </div>
+    
+    <script type="importmap">
+    {
+        "imports": {
+            "twigl": "https://unpkg.com/twigl@3.0.1/dist/twigl.mjs"
+        }
+    }
+    </script>
+    <script type="module">
+        import { GL } from 'twigl';
+
+        const canvas = document.getElementById('game-canvas');
+        const gl = canvas.getContext('webgl');
+        
+        const client = new GL(gl);
+
+        const vs = `
+            attribute vec2 position;
+            varying vec2 vUv;
+            void main() {
+                vUv = position * 0.5 + 0.5;
+                vUv.y = 1.0 - vUv.y; // Flip Y for correct texture mapping
+                gl_Position = vec4(position, 0.0, 1.0);
+            }
+        `;
+
+        const fs = `
+            precision highp float;
+            uniform sampler2D uTexture;
+            varying vec2 vUv;
+
+            void main() {
+                vec4 color = texture2D(uTexture, vUv);
+                float brightness = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+                
+                // Additive glow for bright areas
+                if (brightness > 0.6) {
+                    color.rgb += color.rgb * 0.4;
+                }
+                
+                gl_FragColor = color;
+            }
+        `;
+
+        const program = client.createProgram(vs, fs);
+        client.useProgram(program);
+
+        const position = [
+            -1.0,  1.0,
+             1.0,  1.0,
+            -1.0, -1.0,
+             1.0, -1.0,
+        ];
+        const attribute = {
+            position: {
+                size: 2,
+                data: new Float32Array(position)
+            }
+        };
+
+        const texture = await client.createTextureAsync('game-board.png');
+
+        client.setAttributes(attribute);
+        client.setUniforms({ uTexture: texture });
+        
+        function render() {
+            client.draw(gl.TRIANGLE_STRIP, 4);
+        }
+
+        // --- Bunny Animation ---
+        
+        const bunnyContainer = document.getElementById('bunny-container');
+        const numBunnies = 5;
+        const gravity = 0.5;
+        const bounceFactor = -0.8;
+        let bunnies = [];
+
+        class Bunny {
+            constructor(element, container) {
+                this.el = element;
+                this.container = container;
+                this.x = Math.random() * this.container.clientWidth;
+                this.y = Math.random() * this.container.clientHeight;
+                this.vx = (Math.random() - 0.5) * 8;
+                this.vy = (Math.random() - 0.5) * 5;
+            }
+
+            update() {
+                // Apply gravity
+                this.vy += gravity;
+
+                // Update position
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Wall collision (left/right)
+                if (this.x + this.el.clientWidth > this.container.clientWidth || this.x < 0) {
+                    this.vx *= -1;
+                    this.x = Math.max(0, Math.min(this.x, this.container.clientWidth - this.el.clientWidth));
+                }
+
+                // Floor collision (bounce)
+                if (this.y + this.el.clientHeight > this.container.clientHeight) {
+                    this.y = this.container.clientHeight - this.el.clientHeight;
+                    this.vy *= bounceFactor;
+                    // Add a little horizontal kick on bounce
+                    if (Math.abs(this.vy) < 1) this.vy = (Math.random() - 0.5) * 5 - 5;
+                }
+                
+                // Update element style
+                this.el.style.transform = `translate(${this.x}px, ${this.y}px)`;
+                this.el.style.transform += this.vx > 0 ? ' scaleX(1)' : ' scaleX(-1)';
+            }
+        }
+        
+        for (let i = 0; i < numBunnies; i++) {
+            const bunnyEl = document.createElement('img');
+            bunnyEl.src = 'bunny.png';
+            bunnyEl.className = 'bunny';
+            bunnyContainer.appendChild(bunnyEl);
+            bunnies.push(new Bunny(bunnyEl, bunnyContainer));
+        }
+
+        function animate() {
+            bunnies.forEach(bunny => bunny.update());
+            requestAnimationFrame(animate);
+        }
+
+        // Resize handler
+        function onResize() {
+            const { width, height } = client.canvas.getBoundingClientRect();
+            client.canvas.width = width;
+            client.canvas.height = height;
+            gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+            render(); // Re-render on resize
+        }
+        window.addEventListener('resize', onResize);
+
+        // Initial setup
+        onResize();
+        animate();
+        
+    </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
