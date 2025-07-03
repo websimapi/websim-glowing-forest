@@ -21,20 +21,13 @@
             width: 100vw;
             height: 100vh;
             position: relative;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            background-image: url('game-board.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            filter: brightness(1.2) saturate(1.3);
         }
         
-        #game-canvas {
-            width: 100vw;
-            height: 100vh;
-            object-fit: fill; /* Stretch to fill the viewport */
-            position: absolute;
-            top: 0;
-            left: 0;
-        }
-
         .bunny-container {
             position: absolute;
             bottom: 0;
@@ -46,14 +39,14 @@
 
         .bunny {
             position: absolute;
-            width: 50px; /* Adjust size as needed */
+            width: 50px;
             height: 50px;
             will-change: transform;
         }
         
         /* Mobile landscape optimization */
         @media screen and (max-width: 768px) and (orientation: landscape) {
-            #game-canvas {
+            .game-container {
                 width: 100vw;
                 height: 100vh;
             }
@@ -82,7 +75,6 @@
 </head>
 <body>
     <div class="game-container">
-        <canvas id="game-canvas"></canvas>
         <div id="bunny-container" class="bunny-container"></div>
     </div>
     
@@ -167,8 +159,8 @@
             constructor(element, container) {
                 this.el = element;
                 this.container = container;
-                this.x = Math.random() * this.container.clientWidth;
-                this.y = Math.random() * this.container.clientHeight;
+                this.x = Math.random() * (this.container.clientWidth - 50);
+                this.y = Math.random() * (this.container.clientHeight - 50);
                 this.vx = (Math.random() - 0.5) * 8;
                 this.vy = (Math.random() - 0.5) * 5;
             }
@@ -182,14 +174,14 @@
                 this.y += this.vy;
 
                 // Wall collision (left/right)
-                if (this.x + this.el.clientWidth > this.container.clientWidth || this.x < 0) {
+                if (this.x + 50 > this.container.clientWidth || this.x < 0) {
                     this.vx *= -1;
-                    this.x = Math.max(0, Math.min(this.x, this.container.clientWidth - this.el.clientWidth));
+                    this.x = Math.max(0, Math.min(this.x, this.container.clientWidth - 50));
                 }
 
                 // Floor collision (bounce)
-                if (this.y + this.el.clientHeight > this.container.clientHeight) {
-                    this.y = this.container.clientHeight - this.el.clientHeight;
+                if (this.y + 50 > this.container.clientHeight) {
+                    this.y = this.container.clientHeight - 50;
                     this.vy *= bounceFactor;
                     // Add a little horizontal kick on bounce
                     if (Math.abs(this.vy) < 1) this.vy = (Math.random() - 0.5) * 5 - 5;
@@ -201,12 +193,16 @@
             }
         }
         
-        for (let i = 0; i < numBunnies; i++) {
-            const bunnyEl = document.createElement('img');
-            bunnyEl.src = 'bunny.png';
-            bunnyEl.className = 'bunny';
-            bunnyContainer.appendChild(bunnyEl);
-            bunnies.push(new Bunny(bunnyEl, bunnyContainer));
+        // Wait for images to load before starting animation
+        function initializeBunnies() {
+            for (let i = 0; i < numBunnies; i++) {
+                const bunnyEl = document.createElement('img');
+                bunnyEl.src = 'bunny.png';
+                bunnyEl.className = 'bunny';
+                bunnyContainer.appendChild(bunnyEl);
+                bunnies.push(new Bunny(bunnyEl, bunnyContainer));
+            }
+            animate();
         }
 
         function animate() {
@@ -224,10 +220,8 @@
         }
         window.addEventListener('resize', onResize);
 
-        // Initial setup
-        onResize();
-        animate();
-        render(); // Start the render loop
+        // Start the game when the page loads
+        window.addEventListener('load', initializeBunnies);
         
     </script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
