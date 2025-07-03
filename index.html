@@ -25,7 +25,13 @@
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
-            filter: brightness(1.2) saturate(1.3);
+            filter: brightness(1.4) saturate(1.8) contrast(1.2);
+            animation: glow-pulse 4s ease-in-out infinite alternate;
+        }
+        
+        @keyframes glow-pulse {
+            0% { filter: brightness(1.4) saturate(1.8) contrast(1.2) hue-rotate(0deg); }
+            100% { filter: brightness(1.6) saturate(2.2) contrast(1.3) hue-rotate(10deg); }
         }
         
         .bunny-container {
@@ -42,6 +48,7 @@
             width: 50px;
             height: 50px;
             will-change: transform;
+            filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.3));
         }
         
         /* Mobile landscape optimization */
@@ -150,9 +157,9 @@
         // --- Bunny Animation ---
         
         const bunnyContainer = document.getElementById('bunny-container');
-        const numBunnies = 5;
-        const gravity = 0.5;
-        const bounceFactor = -0.8;
+        const numBunnies = 8;
+        const gravity = 0.4;
+        const bounceFactor = -0.7;
         let bunnies = [];
 
         class Bunny {
@@ -161,8 +168,10 @@
                 this.container = container;
                 this.x = Math.random() * (this.container.clientWidth - 50);
                 this.y = Math.random() * (this.container.clientHeight - 50);
-                this.vx = (Math.random() - 0.5) * 8;
-                this.vy = (Math.random() - 0.5) * 5;
+                this.vx = (Math.random() - 0.5) * 6;
+                this.vy = (Math.random() - 0.5) * 4 - 2;
+                this.rotation = 0;
+                this.rotationSpeed = (Math.random() - 0.5) * 0.3;
             }
 
             update() {
@@ -172,10 +181,11 @@
                 // Update position
                 this.x += this.vx;
                 this.y += this.vy;
+                this.rotation += this.rotationSpeed;
 
                 // Wall collision (left/right)
                 if (this.x + 50 > this.container.clientWidth || this.x < 0) {
-                    this.vx *= -1;
+                    this.vx *= -0.8;
                     this.x = Math.max(0, Math.min(this.x, this.container.clientWidth - 50));
                 }
 
@@ -184,22 +194,37 @@
                     this.y = this.container.clientHeight - 50;
                     this.vy *= bounceFactor;
                     // Add a little horizontal kick on bounce
-                    if (Math.abs(this.vy) < 1) this.vy = (Math.random() - 0.5) * 5 - 5;
+                    if (Math.abs(this.vy) < 1) this.vy = Math.random() * -8 - 3;
+                    this.vx += (Math.random() - 0.5) * 2;
+                }
+                
+                // Random jump occasionally
+                if (Math.random() < 0.002) {
+                    this.vy = Math.random() * -8 - 5;
+                    this.vx += (Math.random() - 0.5) * 4;
                 }
                 
                 // Update element style
-                this.el.style.transform = `translate(${this.x}px, ${this.y}px)`;
-                this.el.style.transform += this.vx > 0 ? ' scaleX(1)' : ' scaleX(-1)';
+                const scaleX = this.vx > 0 ? 1 : -1;
+                this.el.style.transform = `translate(${this.x}px, ${this.y}px) scaleX(${scaleX}) rotate(${this.rotation}rad)`;
             }
         }
         
-        // Wait for images to load before starting animation
+        // Initialize bunnies
         function initializeBunnies() {
             for (let i = 0; i < numBunnies; i++) {
                 const bunnyEl = document.createElement('img');
                 bunnyEl.src = 'bunny.png';
                 bunnyEl.className = 'bunny';
+                bunnyEl.style.opacity = '0';
                 bunnyContainer.appendChild(bunnyEl);
+                
+                // Fade in bunny after image loads
+                bunnyEl.onload = () => {
+                    bunnyEl.style.transition = 'opacity 0.5s ease-in-out';
+                    bunnyEl.style.opacity = '1';
+                };
+                
                 bunnies.push(new Bunny(bunnyEl, bunnyContainer));
             }
             animate();
@@ -210,19 +235,21 @@
             requestAnimationFrame(animate);
         }
 
-        // Resize handler
-        function onResize() {
-            const { width, height } = client.canvas.getBoundingClientRect();
-            client.canvas.width = width;
-            client.canvas.height = height;
-            gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-            render(); // Re-render on resize
-        }
-        window.addEventListener('resize', onResize);
-
         // Start the game when the page loads
         window.addEventListener('load', initializeBunnies);
         
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            // Reset bunny positions on resize to stay within bounds
+            bunnies.forEach(bunny => {
+                if (bunny.x + 50 > bunny.container.clientWidth) {
+                    bunny.x = bunny.container.clientWidth - 50;
+                }
+                if (bunny.y + 50 > bunny.container.clientHeight) {
+                    bunny.y = bunny.container.clientHeight - 50;
+                }
+            });
+        });
     </script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
